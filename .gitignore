@@ -6,3 +6,10 @@ models/
 *.log
 *.wav
 selftest_out.txt
+
+# Артефакты сборки exe (PyInstaller)
+build/
+dist/
+*.spec
+*.exe
+jarvis/icon.ico
