@@ -10,6 +10,7 @@
   "dialog_window_sec": 8,
   "sample_rate": 16000,
   "input_device": null,
+  "mic_check_sec": 20,
   "command_window_sec": 8,
   "use_whisper": true,
   "whisper_model": "auto",

@@ -49,6 +49,18 @@ class Jarvis:
     def shutdown(self) -> None:
         self.stop_event.set()
 
+    def mic_watchdog(self) -> None:
+        """Если за первые секунды с микрофона тишина и ни одной фразы —
+        устройство, скорее всего, выключено (частый случай с беспроводным)."""
+        delay = float(self.config.get("mic_check_sec", 20))
+        if self.stop_event.wait(delay):
+            return
+        if self.listener.utterances == 0 and self.listener.peak < 200:
+            log.warning("Микрофон молчит (пик %d за %.0f с): %s — проверьте устройство",
+                        self.listener.peak, delay, self.listener.device_name)
+            self.say("Я не слышу микрофон. Проверьте, включён ли он, "
+                     "или укажите нужный в настройках.")
+
     def run_loop(self) -> None:
         try:
             for phrase, audio in self.listener.phrases(self.stop_event):
@@ -177,6 +189,7 @@ def main() -> None:
     worker = threading.Thread(target=jarvis.run_loop, daemon=True, name="jarvis-listener")
     worker.start()
     jarvis.say(f"{APP_NAME} запущен и готов к работе.")
+    threading.Thread(target=jarvis.mic_watchdog, daemon=True, name="mic-watchdog").start()
 
     tray = build_tray(jarvis)
     tray.run()  # блокирует до «Выход»

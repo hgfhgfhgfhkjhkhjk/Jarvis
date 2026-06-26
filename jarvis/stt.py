@@ -11,6 +11,7 @@ import os
 import queue
 from pathlib import Path
 
+import numpy as np
 import sounddevice as sd
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
@@ -43,18 +44,48 @@ class Listener:
         self._model = Model(str(model_dir))
         self._rec = KaldiRecognizer(self._model, sample_rate)
         self._sample_rate = sample_rate
-        self._device = device
+        self._device = self.resolve_device(device)
+        self.device_name = self._current_device_name()
+        log.info("Микрофон: %s", self.device_name)
         self._audio: queue.Queue[bytes] = queue.Queue()
         self._utt_buf: list[bytes] = []  # сырое аудио текущей фразы (для Whisper)
         self._utt_len = 0
+        # Диагностика «глухого» микрофона: пик амплитуды и счётчик фраз
+        self.peak = 0
+        self.utterances = 0
         # Пока ассистент говорит — микрофон игнорируется, чтобы он не слышал сам себя
         self.muted = False
+
+    @staticmethod
+    def resolve_device(device):
+        """null -> устройство по умолчанию; int -> индекс; строка -> поиск по имени."""
+        if device is None or device == "":
+            return None
+        if isinstance(device, int):
+            return device
+        name = str(device).lower()
+        for i, d in enumerate(sd.query_devices()):
+            if d["max_input_channels"] > 0 and name in d["name"].lower():
+                log.info("Микрофон по имени %r -> [%d] %s", device, i, d["name"])
+                return i
+        log.warning("Микрофон по имени %r не найден, беру устройство по умолчанию", device)
+        return None
+
+    def _current_device_name(self) -> str:
+        try:
+            idx = self._device if self._device is not None else sd.default.device[0]
+            return sd.query_devices(idx)["name"]
+        except Exception:
+            return "устройство по умолчанию"
 
     def _callback(self, indata, frames, time_info, status) -> None:
         if status:
             log.warning("Аудиопоток: %s", status)
         if not self.muted:
             self._audio.put(bytes(indata))
+            arr = np.frombuffer(indata, dtype=np.int16)
+            if arr.size:
+                self.peak = max(self.peak, int(np.abs(arr).max()))
 
     def flush(self) -> None:
         """Сброс буфера и распознавателя (после собственной речи)."""
@@ -94,6 +125,7 @@ class Listener:
                     self._utt_buf.clear()
                     self._utt_len = 0
                     if text:
+                        self.utterances += 1
                         log.info("Распознано (vosk): %s", text)
                         yield text, audio
 
