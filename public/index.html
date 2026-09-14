@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jarvis Voice Assistant</title>
+  <meta property="og:title" content="Jarvis Voice Assistant">
+  <meta name="description" content="Windows Voice Assistant with native Ollama Tool Calling and UI Automation">
+  <meta property="og:description" content="Windows Voice Assistant with native Ollama Tool Calling and UI Automation">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    code, pre {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-slate-950">
+
+  <!-- Top Header Navigation -->
+  <header id="app-header" class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 py-3.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-lg shadow-sm">
+          ⚡
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 id="app-title" class="text-base sm:text-lg font-semibold tracking-tight text-white">Jarvis (Phoenix) Assistant</h1>
+            <span id="version-badge" class="px-2 py-0.5 text-xs font-medium rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">v2.1 Tools API</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Голосовой ассистент с нативным Ollama Tool Calling и UI Automation</p>
+        </div>
+      </div>
+
+      <!-- Quick Status Indicators -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div id="status-ollama" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700 text-xs">
+          <span id="ollama-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="ollama-text" class="text-slate-300">Ollama: Проверка...</span>
+        </div>
+
+        <div id="status-tools" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700 text-xs text-slate-300">
+          <span class="text-cyan-400">🛠️</span>
+          <span id="tools-count-badge">25 инструментов</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main id="main-container" class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left Column: Interaction & Command Center (7 cols) -->
+    <section id="chat-section" class="lg:col-span-7 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+      <!-- Chat Header -->
+      <div class="px-4 sm:px-5 py-3.5 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+          <h2 class="text-sm font-semibold text-slate-200">Диалог и выполнение команд</h2>
+        </div>
+        <button id="btn-clear-chat" class="text-xs text-slate-400 hover:text-slate-200 transition-colors px-2 py-1 rounded hover:bg-slate-800">
+          Очистить диалог
+        </button>
+      </div>
+
+      <!-- Quick Commands Bar -->
+      <div class="px-4 py-2 bg-slate-950/40 border-b border-slate-800/60 overflow-x-auto flex gap-1.5 scrollbar-none">
+        <span class="text-xs text-slate-500 self-center whitespace-nowrap pl-1 pr-1 font-medium">Примеры:</span>
+        <button class="quick-cmd-btn text-xs px-2.5 py-1 rounded-md bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60 whitespace-nowrap transition-colors" data-cmd="сделай скриншот">
+          📸 Скриншот
+        </button>
+        <button class="quick-cmd-btn text-xs px-2.5 py-1 rounded-md bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60 whitespace-nowrap transition-colors" data-cmd="найди в гугле последние новости космоса">
+          🔍 Поиск в Google
+        </button>
+        <button class="quick-cmd-btn text-xs px-2.5 py-1 rounded-md bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60 whitespace-nowrap transition-colors" data-cmd="список открытых окон">
+          🪟 Список окон
+        </button>
+        <button class="quick-cmd-btn text-xs px-2.5 py-1 rounded-md bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60 whitespace-nowrap transition-colors" data-cmd="что лежит в папке загрузки">
+          📁 Папка Загрузки
+        </button>
+        <button class="quick-cmd-btn text-xs px-2.5 py-1 rounded-md bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60 whitespace-nowrap transition-colors" data-cmd="увеличь громкость">
+          🔊 Громкость +
+        </button>
+      </div>
+
+      <!-- Messages Stream -->
+      <div id="chat-messages" class="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 min-h-[360px] max-h-[520px]">
+        <!-- Welcome Message -->
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 text-sm">
+            AI
+          </div>
+          <div class="flex-1 bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 text-sm text-slate-200 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span class="font-medium text-cyan-400">Jarvis / Phoenix</span>
+              <span>Сейчас</span>
+            </div>
+            <p>Здравствуйте, сэр. Все 25 функций Tool Calling и модуль Windows UI Automation готовы к работе. Вы можете вводить команды текстом или использовать голосовой ввод микрофоном.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="p-4 border-t border-slate-800/80 bg-slate-900/90">
+        <form id="command-form" class="flex items-center gap-2">
+          <button type="button" id="btn-mic" title="Голосовой ввод (Web Speech API)" class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-colors shrink-0">
+            <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z" />
+            </svg>
+          </button>
+          
+          <div class="flex-1 relative">
+            <input 
+              id="cmd-input" 
+              type="text" 
+              autocomplete="off"
+              placeholder="Введите команду (например: сделай скриншот, сверни блокнот, открой youtube)..." 
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+            />
+          </div>
+
+          <button type="submit" id="btn-send" class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold rounded-lg text-sm transition-colors flex items-center gap-1.5 shrink-0">
+            <span>Отправить</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
+        </form>
+        <div id="mic-status" class="text-xs text-amber-400 mt-1.5 hidden">Слушаю ваш голос... Говорите в микрофон</div>
+      </div>
+    </section>
+
+    <!-- Right Column: Tools Registry & Inspection Panel (5 cols) -->
+    <section id="tools-section" class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- Registered Tools Catalog -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col">
+        <div class="px-4 sm:px-5 py-3.5 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-cyan-400 text-sm">🧩</span>
+            <h2 class="text-sm font-semibold text-slate-200">Реестр инструментов (Tool Calling)</h2>
+          </div>
+          <span id="tools-counter-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">25 tools</span>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="px-4 py-2 bg-slate-950/40 border-b border-slate-800/60 flex gap-1 overflow-x-auto text-xs">
+          <button class="tool-filter-btn px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 font-medium border border-cyan-800/80" data-filter="all">Все</button>
+          <button class="tool-filter-btn px-2.5 py-1 rounded bg-slate-800/80 text-slate-400 hover:text-slate-200" data-filter="windows">Окна & UI</button>
+          <button class="tool-filter-btn px-2.5 py-1 rounded bg-slate-800/80 text-slate-400 hover:text-slate-200" data-filter="input">Ввод</button>
+          <button class="tool-filter-btn px-2.5 py-1 rounded bg-slate-800/80 text-slate-400 hover:text-slate-200" data-filter="apps">Программы</button>
+          <button class="tool-filter-btn px-2.5 py-1 rounded bg-slate-800/80 text-slate-400 hover:text-slate-200" data-filter="files">Файлы</button>
+        </div>
+
+        <!-- Tools List -->
+        <div id="tools-list" class="p-3 overflow-y-auto max-h-[380px] space-y-2">
+          <!-- Populated by JS -->
+          <div class="text-center py-6 text-xs text-slate-500">Загрузка реестра инструментов...</div>
+        </div>
+      </div>
+
+      <!-- Quick Tool Runner / Test Modal -->
+      <div id="tool-runner-card" class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-cyan-400 text-xs">⚡</span>
+            <h3 class="text-xs font-semibold text-slate-200">Тестовый запуск инструмента напрямую</h3>
+          </div>
+          <span id="selected-tool-name" class="text-xs font-mono text-cyan-400">take_screenshot</span>
+        </div>
+        <p id="selected-tool-desc" class="text-xs text-slate-400 mb-3">Сделать снимок экрана (скриншот) и сохранить его.</p>
+        
+        <div class="space-y-2.5">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Аргументы (JSON):</label>
+            <textarea id="tool-args-input" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500" placeholder="{}">{}</textarea>
+          </div>
+          
+          <button id="btn-run-tool" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-medium rounded-lg text-xs border border-cyan-800/60 transition-colors flex items-center justify-center gap-1.5">
+            <span>Выполнить инструмент</span>
+          </button>
+        </div>
+
+        <div id="tool-result-box" class="mt-3 p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs hidden">
+          <div class="text-slate-500 text-[10px] uppercase tracking-wider mb-1">Результат:</div>
+          <pre id="tool-result-content" class="text-slate-300 overflow-x-auto whitespace-pre-wrap"></pre>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Configuration Modal / Drawer (Hidden by default) -->
+  <footer class="border-t border-slate-800/80 bg-slate-900/60 px-4 sm:px-6 py-3 text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>Голосовой ассистент Jarvis (Phoenix) • Ollama Tool Calling • Windows UI Automation</div>
+      <div class="flex items-center gap-4">
+        <button id="btn-open-config" class="hover:text-slate-300 transition-colors underline">Настройки config.json</button>
+        <span class="text-slate-600">|</span>
+        <span id="platform-label">Platform: Web Container</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Config Dialog -->
+  <dialog id="config-dialog" class="bg-slate-900 text-slate-200 border border-slate-700 rounded-xl p-6 max-w-xl w-full shadow-2xl backdrop:bg-slate-950/80">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+      <h3 class="text-base font-semibold text-white">Конфигурация (config.json)</h3>
+      <button id="btn-close-config" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-400 mb-1">JSON конфигурации:</label>
+        <textarea id="config-editor" rows="12" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-400 focus:outline-none focus:border-cyan-500"></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="btn-cancel-config" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-colors">Отмена</button>
+        <button id="btn-save-config" class="px-4 py-2 rounded-lg bg-cyan-600 text-slate-950 font-semibold text-xs hover:bg-cyan-500 transition-colors">Сохранить</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Client Script -->
+  <script>
+    let registeredTools = [];
+    let selectedTool = null;
+
+    // Elements
+    const chatMessages = document.getElementById('chat-messages');
+    const cmdInput = document.getElementById('cmd-input');
+    const commandForm = document.getElementById('command-form');
+    const btnMic = document.getElementById('btn-mic');
+    const micStatus = document.getElementById('mic-status');
+    const toolsList = document.getElementById('tools-list');
+    const ollamaDot = document.getElementById('ollama-dot');
+    const ollamaText = document.getElementById('ollama-text');
+    const toolsCountBadge = document.getElementById('tools-count-badge');
+    const toolsCounterBadge = document.getElementById('tools-counter-badge');
+    const selectedToolName = document.getElementById('selected-tool-name');
+    const selectedToolDesc = document.getElementById('selected-tool-desc');
+    const toolArgsInput = document.getElementById('tool-args-input');
+    const btnRunTool = document.getElementById('btn-run-tool');
+    const toolResultBox = document.getElementById('tool-result-box');
+    const toolResultContent = document.getElementById('tool-result-content');
+    const btnClearChat = document.getElementById('btn-clear-chat');
+    const configDialog = document.getElementById('config-dialog');
+    const btnOpenConfig = document.getElementById('btn-open-config');
+    const btnCloseConfig = document.getElementById('btn-close-config');
+    const btnCancelConfig = document.getElementById('btn-cancel-config');
+    const btnSaveConfig = document.getElementById('btn-save-config');
+    const configEditor = document.getElementById('config-editor');
+    const platformLabel = document.getElementById('platform-label');
+
+    // Tool categories map
+    const categoryMap = {
+      windows: ['focus_window', 'minimize_window', 'maximize_window', 'restore_window', 'close_window', 'list_windows', 'click_ui_element', 'get_screen_size'],
+      input: ['mouse_click', 'mouse_move', 'mouse_scroll', 'type_text', 'press_key', 'hotkey'],
+      apps: ['open_app', 'close_app', 'open_site', 'search_internet', 'media_key'],
+      files: ['open_folder', 'list_folder', 'create_file', 'take_screenshot', 'open_last_file', 'wait_seconds']
+    };
+
+    function appendMessage(role, text, timeMs = null, isError = false) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex items-start gap-3';
+      
+      const isUser = role === 'user';
+      const avatarClass = isUser 
+        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' 
+        : (isError ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400');
+      const avatarText = isUser ? 'Вы' : (isError ? '!' : 'AI');
+      const boxClass = isUser ? 'bg-indigo-950/40 border-indigo-800/40 text-indigo-100' : 'bg-slate-800/60 border-slate-700/60 text-slate-200';
+      const roleName = isUser ? 'Вы' : 'Jarvis';
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const elapsedBadge = timeMs !== null ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 text-cyan-400 border border-slate-700">${timeMs} ms</span>` : '';
+
+      wrapper.innerHTML = `
+        <div class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 text-xs font-semibold ${avatarClass}">
+          ${avatarText}
+        </div>
+        <div class="flex-1 border rounded-xl p-3.5 text-sm space-y-1.5 ${boxClass}">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span class="font-medium ${isUser ? 'text-indigo-300' : 'text-cyan-400'}">${roleName}</span>
+            <div class="flex items-center gap-2">
+              ${elapsedBadge}
+              <span>${timeStr}</span>
+            </div>
+          </div>
+          <p class="whitespace-pre-wrap leading-relaxed">${escapeHtml(text)}</p>
+        </div>
+      `;
+
+      chatMessages.appendChild(wrapper);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Execute text command
+    async function sendCommand(text) {
+      if (!text || !text.trim()) return;
+      const q = text.trim();
+      cmdInput.value = '';
+      appendMessage('user', q);
+
+      try {
+        const res = await fetch('/api/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          appendMessage('assistant', data.reply || 'Команда выполнена.', data.elapsed_ms);
+        } else {
+          appendMessage('assistant', 'Ошибка: ' + (data.error || 'Не удалось выполнить команду'), null, true);
+        }
+      } catch (err) {
+        appendMessage('assistant', 'Сетевая ошибка: ' + err.message, null, true);
+      }
+    }
+
+    // Load initial system status and tools
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.ok) {
+          if (data.ollama_available) {
+            ollamaDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+            ollamaText.textContent = `Ollama: Онлайн (${data.model})`;
+          } else {
+            ollamaDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+            ollamaText.textContent = 'Ollama: Standby (Автономный режим)';
+          }
+
+          toolsCountBadge.textContent = `${data.tools_count} инструментов`;
+          toolsCounterBadge.textContent = `${data.tools_count} tools`;
+          platformLabel.textContent = `OS: ${data.platform || 'windows'}`;
+
+          registeredTools = data.tools_detail || [];
+          renderTools('all');
+
+          if (registeredTools.length > 0) {
+            selectTool(registeredTools[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load status', err);
+      }
+    }
+
+    function renderTools(filter = 'all') {
+      toolsList.innerHTML = '';
+      const filtered = registeredTools.filter(t => {
+        const name = t.function.name;
+        if (filter === 'all') return true;
+        if (categoryMap[filter]) {
+          return categoryMap[filter].includes(name);
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        toolsList.innerHTML = '<div class="text-center py-4 text-xs text-slate-500">Нет инструментов в этой категории</div>';
+        return;
+      }
+
+      filtered.forEach(item => {
+        const fn = item.function;
+        const div = document.createElement('div');
+        div.className = `p-2.5 rounded-lg border cursor-pointer transition-all ${selectedTool?.function?.name === fn.name ? 'bg-cyan-950/60 border-cyan-500/60 text-white' : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700 text-slate-300'}`;
+        
+        const props = Object.keys(fn.parameters?.properties || {});
+        const required = fn.parameters?.required || [];
+        const paramsHtml = props.length 
+          ? props.map(p => `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono ${required.includes(p) ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-slate-800 text-slate-400'}">${p}</span>`).join(' ')
+          : '<span class="text-[10px] text-slate-500 italic">без параметров</span>';
+
+        div.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-mono font-semibold text-cyan-400">${fn.name}</span>
+            <div class="flex items-center gap-1">${paramsHtml}</div>
+          </div>
+          <p class="text-xs text-slate-400 mt-1 line-clamp-2">${escapeHtml(fn.description)}</p>
+        `;
+
+        div.addEventListener('click', () => {
+          selectTool(item);
+          renderTools(filter);
+        });
+
+        toolsList.appendChild(div);
+      });
+    }
+
+    function selectTool(item) {
+      selectedTool = item;
+      const fn = item.function;
+      selectedToolName.textContent = fn.name;
+      selectedToolDesc.textContent = fn.description;
+
+      // Generate default args json
+      const defaultArgs = {};
+      if (fn.parameters?.properties) {
+        for (const [key, val] of Object.entries(fn.parameters.properties)) {
+          if (val.type === 'string') {
+            defaultArgs[key] = key === 'engine' ? 'google' : (key === 'url_or_domain' ? 'youtube.com' : 'тест');
+          } else if (val.type === 'number' || val.type === 'integer') {
+            defaultArgs[key] = 1;
+          } else if (val.type === 'boolean') {
+            defaultArgs[key] = false;
+          }
+        }
+      }
+      toolArgsInput.value = JSON.stringify(defaultArgs, null, 2);
+      toolResultBox.classList.add('hidden');
+    }
+
+    // Direct Tool Execution
+    btnRunTool.addEventListener('click', async () => {
+      if (!selectedTool) return;
+      const name = selectedTool.function.name;
+      let args = {};
+      try {
+        args = JSON.parse(toolArgsInput.value.trim() || '{}');
+      } catch (e) {
+        alert('Неверный формат JSON аргументов: ' + e.message);
+        return;
+      }
+
+      btnRunTool.disabled = true;
+      btnRunTool.innerHTML = '<span>Выполняется...</span>';
+
+      try {
+        const res = await fetch('/api/tool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, args })
+        });
+        const data = await res.json();
+        toolResultBox.classList.remove('hidden');
+        toolResultContent.textContent = JSON.stringify(data, null, 2);
+        
+        // Also log to chat
+        appendMessage('assistant', `[Инструмент ${name}] Результат:\n${typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)}`);
+      } catch (err) {
+        toolResultBox.classList.remove('hidden');
+        toolResultContent.textContent = 'Ошибка: ' + err.message;
+      } finally {
+        btnRunTool.disabled = false;
+        btnRunTool.innerHTML = '<span>Выполнить инструмент</span>';
+      }
+    });
+
+    // Form submit
+    commandForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      sendCommand(cmdInput.value);
+    });
+
+    // Quick Command Buttons
+    document.querySelectorAll('.quick-cmd-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.getAttribute('data-cmd');
+        sendCommand(cmd);
+      });
+    });
+
+    // Filter Buttons
+    document.querySelectorAll('.tool-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-filter-btn').forEach(b => {
+          b.className = 'tool-filter-btn px-2.5 py-1 rounded bg-slate-800/80 text-slate-400 hover:text-slate-200';
+        });
+        btn.className = 'tool-filter-btn px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 font-medium border border-cyan-800/80';
+        renderTools(btn.getAttribute('data-filter'));
+      });
+    });
+
+    // Clear chat
+    btnClearChat.addEventListener('click', () => {
+      chatMessages.innerHTML = '';
+      appendMessage('assistant', 'Диалог очищен. Готов к новым командам.');
+    });
+
+    // Web Speech API
+    let recognition = null;
+    let isListening = false;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isListening = true;
+        btnMic.classList.add('bg-rose-950', 'text-rose-400', 'border-rose-700');
+        micStatus.classList.remove('hidden');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        cmdInput.value = transcript;
+        sendCommand(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        micStatus.textContent = 'Ошибка распознавания речи: ' + event.error;
+        setTimeout(() => micStatus.classList.add('hidden'), 3000);
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        btnMic.classList.remove('bg-rose-950', 'text-rose-400', 'border-rose-700');
+        micStatus.classList.add('hidden');
+      };
+
+      btnMic.addEventListener('click', () => {
+        if (isListening) {
+          recognition.stop();
+        } else {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      });
+    } else {
+      btnMic.title = 'Web Speech API не поддерживается в этом браузере';
+      btnMic.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    // Config Dialog Handling
+    btnOpenConfig.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/config');
+        const data = await res.json();
+        if (data.ok) {
+          configEditor.value = JSON.stringify(data.config, null, 2);
+          configDialog.showModal();
+        }
+      } catch (err) {
+        alert('Не удалось загрузить config.json: ' + err.message);
+      }
+    });
+
+    btnCloseConfig.addEventListener('click', () => configDialog.close());
+    btnCancelConfig.addEventListener('click', () => configDialog.close());
+
+    btnSaveConfig.addEventListener('click', async () => {
+      try {
+        const parsed = JSON.parse(configEditor.value);
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parsed)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          configDialog.close();
+          loadStatus();
+        } else {
+          alert('Ошибка сохранения: ' + data.error);
+        }
+      } catch (e) {
+        alert('Неверный формат JSON: ' + e.message);
+      }
+    });
+
+    // Initialize
+    loadStatus();
+  </script>
+</body>
+</html>

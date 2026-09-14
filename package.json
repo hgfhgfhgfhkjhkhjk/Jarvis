@@ -1,0 +1,14 @@
+{
+  "name": "jarvis-assistant",
+  "version": "1.0.0",
+  "description": "Voice Assistant Jarvis with Ollama Tool Calling and Windows UI Automation",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'Build complete'",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

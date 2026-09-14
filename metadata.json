@@ -1,0 +1,10 @@
+{
+  "name": "Jarvis Voice Assistant",
+  "description": "Windows Voice Assistant with native Ollama Tool Calling and UI Automation",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

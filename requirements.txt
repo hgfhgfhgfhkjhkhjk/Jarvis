@@ -18,3 +18,7 @@ winrt-Windows.Foundation.Collections>=3.2
 winrt-Windows.Media.SpeechSynthesis>=3.2
 winrt-Windows.Media.Control>=3.2
 winrt-Windows.Storage.Streams>=3.2
+# Автоматизация интерфейса Windows (UI Automation & мышь/клавиатура)
+pyautogui>=0.9.54
+pywinauto>=0.6.8
+pyperclip>=1.8.2

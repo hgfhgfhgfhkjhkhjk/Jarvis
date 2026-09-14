@@ -128,6 +128,8 @@ class IntentHandler:
     def __init__(self, config: dict, apps: list, brain=None):
         self.apps = apps
         self.brain = brain
+        if self.brain is not None and hasattr(self.brain, "bind_handler"):
+            self.brain.bind_handler(self)
         self.installed = scan_start_menu()
         self.steam_games = scan_steam_games()
         self.music_app = config.get("music_app", "яндекс музыка")
@@ -238,8 +240,14 @@ class IntentHandler:
         if reply:
             return reply
 
-        # Правила не справились — спрашиваем локальную нейронку
+        # Правила не справились — передаём в локальную нейронку (Tool Calling / Function Calling)
         if self.brain is not None:
+            if hasattr(self.brain, "run"):
+                res = self.brain.run(cmd, history=list(self.dialog))
+                if res and res.reply:
+                    self.last_was_chat = not bool(res.steps)
+                    return res.reply
+
             intent = self.brain.parse(cmd)
             if intent and intent.get("action") not in ("answer", "none"):
                 if isinstance(intent.get("steps"), list):
@@ -329,6 +337,43 @@ class IntentHandler:
             return f"Скриншот сохранён в папку {path.parent.name}."
         if action == "answer" and intent.get("reply"):
             return str(intent["reply"])[:300]
+        # UI Automation действия
+        if action == "focus_window" and target:
+            ok = actions.focus_window(target)
+            return f"Окно {target} активировано." if ok else f"Окно {target} не найдено."
+        if action == "minimize_window" and target:
+            ok = actions.minimize_window(target)
+            return f"Окно {target} свернуто." if ok else f"Окно {target} не найдено."
+        if action == "maximize_window" and target:
+            ok = actions.maximize_window(target)
+            return f"Окно {target} развернуто." if ok else f"Окно {target} не найдено."
+        if action == "restore_window" and target:
+            ok = actions.restore_window(target)
+            return f"Окно {target} восстановлено." if ok else f"Окно {target} не найдено."
+        if action == "close_window" and target:
+            ok = actions.close_window(target)
+            return f"Окно {target} закрыто." if ok else f"Окно {target} не найдено."
+        if action == "list_windows":
+            wins = actions.list_windows()
+            return f"Открытые окна: {', '.join(wins[:10])}." if wins else "Нет открытых окон."
+        if action == "mouse_click":
+            actions.mouse_click(x=intent.get("x"), y=intent.get("y"),
+                                button=str(intent.get("button", "left")),
+                                clicks=int(intent.get("clicks", 1) or 1))
+            return "Готово."
+        if action == "type_text" and intent.get("text"):
+            actions.type_text(str(intent["text"]))
+            return "Текст напечатан."
+        if action == "press_key" and intent.get("key"):
+            actions.press_key(str(intent["key"]))
+            return "Клавиша нажата."
+        if action == "hotkey" and intent.get("keys"):
+            actions.hotkey(*intent["keys"])
+            return "Готово."
+        if action == "click_ui_element":
+            actions.click_ui_element(str(intent.get("window_title", "")),
+                                     str(intent.get("control_name", "")))
+            return "Готово."
         return None
 
     # --- внутренности -------------------------------------------------

@@ -6,7 +6,10 @@
 
 import logging
 import re
-import winreg
+try:
+    import winreg
+except ImportError:
+    winreg = None
 from pathlib import Path
 
 from jarvis.matching import match_score
@@ -18,6 +21,8 @@ _SKIP = ("redistributable", "proton", "steamworks", "steam linux", "runtime")
 
 
 def _steam_root() -> Path | None:
+    if winreg is None:
+        return None
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as k:
             return Path(winreg.QueryValueEx(k, "SteamPath")[0])

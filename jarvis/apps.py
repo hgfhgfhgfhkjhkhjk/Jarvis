@@ -2,7 +2,10 @@
 
 import logging
 import os
-import winreg
+try:
+    import winreg
+except ImportError:
+    winreg = None
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -30,6 +33,8 @@ class App:
 
 
 def _steam_exe() -> str | None:
+    if winreg is None:
+        return None
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as k:
             return winreg.QueryValueEx(k, "SteamExe")[0]
