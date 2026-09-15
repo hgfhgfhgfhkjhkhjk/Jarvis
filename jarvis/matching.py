@@ -74,8 +74,15 @@ def match_score(spoken: str, candidate: str) -> float:
         for c in {cand, _fold(translit(cand))}:
             if s == c:
                 return 1.0
-            if len(s) >= 3 and (s in c or c in s):
-                best = max(best, 0.9)
+            if len(s) >= 3:
+                # сказанное содержится в кандидате (например «стим» в «steam client»)
+                if s in c:
+                    best = max(best, 0.9)
+                # кандидат содержится в сказанном — только если кандидат составляет большую часть фразы
+                elif c in s:
+                    ratio = len(c) / max(len(s), 1)
+                    if ratio >= 0.65 or len(s.split()) <= len(c.split()) + 1:
+                        best = max(best, 0.85)
             best = max(best, SequenceMatcher(None, s, c).ratio())
             best = max(best, SequenceMatcher(None, s.replace(" ", ""), c.replace(" ", "")).ratio())
             s_words, c_words = s.split(), c.split()

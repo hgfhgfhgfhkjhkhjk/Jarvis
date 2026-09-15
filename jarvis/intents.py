@@ -147,9 +147,13 @@ class IntentHandler:
 
     # --- цепочки: «сделай скриншот и открой его» -------------------------
 
-    _CHAIN_SEP = re.compile(r"\s+(?:а\s+)?(?:и|потом|затем|после этого)\s+")
+    _CHAIN_SEP = re.compile(
+        r"\s+(?:а\s+)?(?:и|потом|затем|после этого)\s+"
+        r"|\s+(?=(?:напиши|напечатай|отправь|введи|нажми|кликни|сделай|закрой|сверни)\b)"
+    )
     _CHAIN_STARTERS = {"сделай", "сними", "найди", "поищи", "загугли", "погугли",
-                       "скажи", "поставь", "переключи", "покажи", "создай", "посмотри"}
+                       "скажи", "поставь", "переключи", "покажи", "создай", "посмотри",
+                       "напиши", "напечатай", "отправь", "введи", "нажми", "кликни"}
     # односложные команды, которым позволено быть отдельным шагом цепочки
     _CHAIN_SINGLES = {"пауза", "плей", "стоп", "скриншот", "громче", "тише",
                       "погромче", "потише", "дальше"}
@@ -321,10 +325,14 @@ class IntentHandler:
         if action == "close_app" and target:
             return self._do_close(target)
         if action == "open_site" and (target or query):
-            site = target or query
-            if "." in (intent.get("target") or ""):  # LLM знает домен: pornhub.com
-                actions.open_url("https://" + str(intent["target"]).strip().lower())
-                return f"Открываю {site}."
+            site = (target or query).strip()
+            raw_url = str(intent.get("target") or site).strip()
+            if "." in raw_url:
+                url = raw_url if "://" in raw_url else f"https://{raw_url}"
+                actions.open_url(url)
+                # Чистое имя для озвучки голосом (без https://, www., слешей)
+                clean_name = raw_url.split("://")[-1].replace("www.", "").rstrip("/")
+                return f"Открываю {clean_name}."
             return self._open_site(site)
         if action == "search" and (query or target):
             engine = intent.get("engine") if intent.get("engine") in ("google", "youtube", "wiki") else "google"
